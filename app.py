@@ -1,3 +1,5 @@
+from textwrap import indent
+from unicodedata import name
 from unittest import TestResult
 from flask import Flask, request, render_template
 from flask_cors import CORS 
@@ -23,12 +25,12 @@ def recebendo_informacoes():
     variaveis_recebidas = ast.literal_eval(request.data.decode('UTF-8'))
 
     #Variaveis para fazer requisicoes para o GED
-    token_target         = variaveis_recebidas['token']
-    url_target           = f"{variaveis_recebidas['url']}/registro/pesquisa"
-    area_target         = variaveis_recebidas['body']['listaIdArea']
+    token_target  = variaveis_recebidas['token']
+    url_target    = f"{variaveis_recebidas['url']}/registro/pesquisa"
+    area_target   = variaveis_recebidas['body']['listaIdArea']
     indice_target = variaveis_recebidas['body']['indiceArea']
-    datas_target = variaveis_recebidas['body']['datas']
-    # tipo_grafico = variaveis_recebidas['body']['tipoGrafico']
+    datas_target  = variaveis_recebidas['body']['datas']
+    tipo_grafico  = variaveis_recebidas['body']['tipoGrafico']
     
 
     headers = {"Cookie" : f"CXSSID={token_target}",
@@ -42,19 +44,13 @@ def recebendo_informacoes():
         "fim": 1000
     }
 
-    dados_ged = extraindo_informacoes_ged(url_target, body_ged, headers, indice_target, datas_target)
+    dataframe_dados_ged = extraindo_informacoes_ged(url_target, body_ged, headers, indice_target, datas_target)
 
-    return dados_ged
+    dashboard = criando_dashboard(dataframe_dados_ged, indice_target, tipo_grafico)
 
+    return render_template('index.html', iframe=dashboard.show())
 
-    #criando_dashboard
-
-    # data_canada = px.data.gapminder().query("country == 'Canada'")
-    # fig = px.bar(data_canada, x='year', y='pop')
-
-    # return render_template('index.html', iframe=fig.show())
-
-
+#Recebo a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
 def extraindo_informacoes_ged(url, body, headers, indice_target, datas_target):
 
     body_ged = json.dumps(body, ensure_ascii=False)
@@ -83,17 +79,44 @@ def extraindo_informacoes_ged(url, body, headers, indice_target, datas_target):
     datas_target_dataframe['dataInicial'] = pd.to_datetime(datas_target_dataframe['dataInicial'])
     datas_target_dataframe['dataFinal'] = pd.to_datetime(datas_target_dataframe['dataFinal'])
 
+    #Busco o nome da data recebido da aplicação da Weehealth para cada data do registro
+    lista_nome_datas = []
+    for data_registro in dataframe['data_registro']:
+        for datas in datas_target_dataframe.iterrows():
+            
+            #Filtro pelas datas recebidas do weehealth com as datas do GED
+            if (data_registro >= datas[1]['dataInicial']) & (data_registro <= datas[1]['dataFinal']):
+                lista_nome_datas.append(datas[1]['nome'])
 
+    
+    dataframe['nome_data'] = lista_nome_datas
 
-    print(dataframe)
-    print(datas_target_dataframe)
+    return dataframe
 
-    return response_ged.content
+#Passar dados para construir dashboard
+def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
 
-def criando_dashboard():
-    pass
-    #return render_template('index.html', iframe=fig.show())
+    dados_agrupados = dados_dashboard.groupby(['nome_data', indice_target]).count().reset_index().rename(columns={'data_registro' : 'contagem'})
 
+    #Verificando qual tipo de gráfico a aplicação da weehealth quer
+
+    #Gráfico de linhas
+    if tipo_grafico == '1':
+        
+        fig = px.line(dados_agrupados, x="nome_data", y="contagem", color=indice_target, markers=True)
+        return fig
+
+    #Gráfico de barras
+    elif tipo_grafico == '2':
+
+        fig = px.bar(dados_agrupados, x=indice_target, y='contagem', barmode="group", facet_col='nome_data', title=f'Dados referentes a {indice_target}')
+        return fig
+
+    #Gráfico de pizza
+    elif tipo_grafico == '3':
+
+        fig = px.pie(dados_agrupados, values='contagem', names=indice_target)
+        return fig
 
 if __name__ == "__main__":
     app.run()
