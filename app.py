@@ -1,14 +1,15 @@
+#Flask
 from flask import Flask, request, render_template
 from flask_cors import CORS 
+
+#Outros
 import json, requests, ast
+
+#Manipulação de dados
 import pandas as pd 
 
 #Dashboard
 import plotly.express as px
-
-
-#set FLASK_APP = app.py
-#set FLASK_ENV = development
 
 app = Flask(__name__)
 CORS(app)
@@ -29,24 +30,15 @@ def main():
     datas_target  = variaveis_recebidas['body']['datas']
     tipo_grafico  = variaveis_recebidas['body']['tipoGrafico']
     
-
     headers = {"Cookie" : f"CXSSID={token_target}",
                "content-type" : "application/json"
              }
 
-    body_ged = {
-        "listaIdArea": area_target,
-        "listaIndice": [],
-        "inicio": 0,
-        "fim": 1000 #VERIFICAR INICIO E FIM COM COLLA
-    }
-
     #Extração dos dados do GED
-    dataframe_dados_ged = extraindo_informacoes_ged(url_target, body_ged, headers, indice_target, datas_target)
+    dataframe_dados_ged = extraindo_informacoes_ged(url_target, area_target, headers, indice_target, datas_target)
 
     #Chamo o método pra criar o gráfico
     grafico = criando_dashboard(dataframe_dados_ged, indice_target, tipo_grafico)
-
     
     #Caso o script não consiga renderizar o gráfico, retorno um erro
     try: 
@@ -56,29 +48,58 @@ def main():
         return "Ocorreu um erro, tente novamente!"
 
 #Recebo a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
-def extraindo_informacoes_ged(url, body, headers, indice_target, datas_target):
-    
-    #Enviar requisição para o GED
-    body_ged = json.dumps(body, ensure_ascii=False)
-    response_ged = requests.post(url, headers=headers, data=body_ged)
-    retorno_ged = json.loads(response_ged.content.decode('utf-8'))
-    
+def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_target):
+
+    #Aplicando paginação
+
+    #VALIDAR PAGINAÇÃO COM MAIS DE 1K DE REGISTROS 
+
+    inicio = 0
+    fim = 1000 
+
     dataframe = pd.DataFrame()
-    
-    #Preparo o dataframe com os registros do Indice e as datas dos registros
-    for registro in retorno_ged['listaRegistro']:
 
-        chave_valor = {}
-        
-        for indice in registro['listaIndice']:
+    while True:
+
+        body = {
+        "listaIdArea": area_target,
+        "listaIndice": [],
+        "inicio": inicio,
+        "fim": fim 
+        }
+
+        #Enviar requisição para o GED
+        body_ged = json.dumps(body, ensure_ascii=False)
+        response_ged = requests.post(url, headers=headers, data=body_ged)
+        retorno_ged = json.loads(response_ged.content.decode('utf-8'))
+
+        #Preparo o dataframe com os registros do Indice e as datas dos registros
+        for registro in retorno_ged['listaRegistro']:
+
+            chave_valor = {}
             
-            #Buscando a data do registro no GED
-            chave_valor[indice['identificador']] = indice['valor']
+            for indice in registro['listaIndice']:
+                
+                #Buscando a data do registro no GED
+                chave_valor[indice['identificador']] = indice['valor']
+                
 
-        dataframe = dataframe.append({
-            indice_target : chave_valor[indice_target],
-            'data_registro' : pd.to_datetime(chave_valor['Data_do_registro'])
-        }, ignore_index=True)
+            dataframe = dataframe.append({
+                indice_target : chave_valor[indice_target],
+                'data_registro' : pd.to_datetime(chave_valor['Data_do_registro'])
+            }, ignore_index=True)
+
+        if retorno_ged['totalResultadoPesquisa'] == 1000:
+            
+            inicio = fim
+            fim = fim + 1000
+            continue
+        
+        else:
+
+            break 
+
+    print('Menor que 1000')
 
     datas_target_dataframe                = pd.DataFrame(datas_target)
     datas_target_dataframe['dataInicial'] = pd.to_datetime(datas_target_dataframe['dataInicial'])
@@ -93,7 +114,7 @@ def extraindo_informacoes_ged(url, body, headers, indice_target, datas_target):
             if (data_registro >= datas[1]['dataInicial']) & (data_registro <= datas[1]['dataFinal']):
                 lista_nome_datas.append(datas[1]['nome'])
 
-    
+
     dataframe['nome_data'] = lista_nome_datas
 
     return dataframe
@@ -129,7 +150,7 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
 
         dados_agrupados_indice = dados_dashboard[indice_target].value_counts().reset_index(name='contagem').rename(columns={'index' : indice_target})
         print(dados_agrupados_indice)
-        fig = px.bar(dados_agrupados_indice, x=indice_target, y='contagem', title=f'Dados referentes a {indice_target}')
+        fig = px.bar(dados_agrupados_indice, x=indice_target, y='contagem', title=f'Totalizador dos dados referentes a {indice_target}')
         return fig
     
     else:
