@@ -3,7 +3,7 @@ from flask import Flask, request, render_template
 from flask_cors import CORS 
 
 #Outros
-import json, requests, ast
+import json, requests, ast, math
 
 #Manipulação de dados
 import pandas as pd 
@@ -52,14 +52,14 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
 
     #Aplicando paginação
 
-    #VALIDAR PAGINAÇÃO COM MAIS DE 1K DE REGISTROS 
-
     inicio = 0
-    fim = 1000 
+    fim = 5000 #Escolhi esse número porque o Zyad disse que é o limite do GED
+    
 
     dataframe = pd.DataFrame()
 
-    while True:
+    #Início dos loops para adicionar dados ao dataframe
+    while True: 
 
         body = {
         "listaIdArea": area_target,
@@ -89,18 +89,21 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
                 'data_registro' : pd.to_datetime(chave_valor['Data_do_registro'])
             }, ignore_index=True)
 
-        if retorno_ged['totalResultadoPesquisa'] == 1000:
-            
+        #Busco a quantidade de loops dividindo a quantidade de fim pelo resultado da pesquisa e arrendondo pra cima.
+        quantidade_loops = (retorno_ged['totalResultadoPesquisa'] / fim)
+        quantidade_loops = math.ceil(quantidade_loops)
+
+        #Se for maior que 1, fazer mais loops, senão já quebro o script e jogo pro dataframe
+        if quantidade_loops > 1: 
+
             inicio = fim
-            fim = fim + 1000
-            continue
+            fim = fim + 5000
+            continue 
         
         else:
 
             break 
-
-    print('Menor que 1000')
-
+        
     datas_target_dataframe                = pd.DataFrame(datas_target)
     datas_target_dataframe['dataInicial'] = pd.to_datetime(datas_target_dataframe['dataInicial'])
     datas_target_dataframe['dataFinal']   = pd.to_datetime(datas_target_dataframe['dataFinal'])
