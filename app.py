@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #Flask
 from flask import Flask, request, render_template, abort
 from flask_cors import CORS 
