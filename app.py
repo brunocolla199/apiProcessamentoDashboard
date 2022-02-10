@@ -1,9 +1,16 @@
 #Flask
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, abort
 from flask_cors import CORS 
 
 #Outros
 import json, requests, math
+
+#Servir aplicação
+from waitress import serve
+
+#Logs
+import logging
+logging.basicConfig(filename='logs_dashboards.txt', format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S', encoding='utf-8')
 
 #Warnings
 import warnings
@@ -27,12 +34,18 @@ def main():
     variaveis_recebidas = request.get_json()
 
     #Variaveis para fazer requisicoes para o GED
-    token_target  = variaveis_recebidas['token']
-    url_target    = f"{variaveis_recebidas['url']}/registro/pesquisa"
-    area_target   = variaveis_recebidas['body']['listaIdArea']
-    indice_target = variaveis_recebidas['body']['indiceArea']
-    datas_target  = variaveis_recebidas['body']['datas']
-    tipo_grafico  = variaveis_recebidas['body']['tipoGrafico']
+    try: 
+
+        token_target  = variaveis_recebidas['token']
+        url_target    = f"{variaveis_recebidas['url']}/registro/pesquisa"
+        area_target   = variaveis_recebidas['body']['listaIdArea']
+        indice_target = variaveis_recebidas['body']['indiceArea']
+        datas_target  = variaveis_recebidas['body']['datas']
+        tipo_grafico  = variaveis_recebidas['body']['tipoGrafico']
+
+    except:
+        logging.error('As informações não foram enviadas corretamente. Tente novamente!')
+        abort(500)
     
     headers = {"Cookie" : f"CXSSID={token_target}",
                "content-type" : "application/json"
@@ -49,7 +62,8 @@ def main():
         #Provavelmente ao lugar de index.html, será o caminho do html da aplicação
         return render_template('index.html', iframe=grafico.show())
     except:
-        return "Ocorreu um erro, tente novamente!"
+        logging.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente!')
+        return abort(500)
 
 #Recebo a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
 def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_target):
@@ -163,8 +177,9 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
     
     else:
         
-        print('Erro ao selecionar o tipo de gráfico.')
-        return "Erro ao selecionar o tipo de gráfico!"
+        return "O dashboard não será renderizado."
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5001)
+    #Para jogar a aplicação em produção usar serve
+    serve(app, host='0.0.0.0', port=5001)    
+    #app.run(host='0.0.0.0', port=5001)
