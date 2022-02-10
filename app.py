@@ -167,4 +167,4 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
         return "Erro ao selecionar o tipo de gráfico!"
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', port=5001)
