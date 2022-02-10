@@ -38,7 +38,7 @@ def main():
     try: 
 
         token_target  = variaveis_recebidas['token']
-        url_target    = f"{variaveis_recebidas['url']}/registro/pesquisa"
+        url_target    = "{}/registro/pesquisa".format(variaveis_recebidas['url'])
         area_target   = variaveis_recebidas['body']['listaIdArea']
         indice_target = variaveis_recebidas['body']['indiceArea']
         datas_target  = variaveis_recebidas['body']['datas']
@@ -48,7 +48,7 @@ def main():
         logging.error('As informações não foram enviadas corretamente. Tente novamente!')
         abort(500)
     
-    headers = {"Cookie" : f"CXSSID={token_target}",
+    headers = {"Cookie" : "CXSSID={}".format(token_target),
                "content-type" : "application/json"
              }
 
@@ -152,19 +152,19 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
     #Gráfico de linhas
     if tipo_grafico == '1':
         
-        fig = px.line(dados_agrupados_data_indice, x="nome_data", y="contagem", color=indice_target, markers=True, title=f'Dados referentes a {indice_target}')
+        fig = px.line(dados_agrupados_data_indice, x="nome_data", y="contagem", color=indice_target, markers=True, title='Dados referentes a {}'.format(indice_target))
         return fig
 
     #Gráfico de barras
     elif tipo_grafico == '2':
 
-        fig = px.bar(dados_agrupados_data_indice, x=indice_target, y='contagem', barmode="group", facet_col='nome_data', title=f'Dados referentes a {indice_target}')
+        fig = px.bar(dados_agrupados_data_indice, x=indice_target, y='contagem', barmode="group", facet_col='nome_data', title='Dados referentes a {}'.format(indice_target))
         return fig
 
     #Gráfico de pizza
     elif tipo_grafico == '3':
 
-        fig = px.pie(dados_agrupados_data_indice, values='contagem', names=indice_target, title=f'Dados referentes a {indice_target}')
+        fig = px.pie(dados_agrupados_data_indice, values='contagem', names=indice_target, title='Dados referentes a {}'.format(indice_target))
         return fig
 
     #Totalizador (A ideia é agrupar só pelo indice_target e ignorar a data)
@@ -173,7 +173,7 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
         #Conto a quantidade total de cada registro
         dados_agrupados_indice = dados_dashboard[indice_target].value_counts().reset_index(name='contagem').rename(columns={'index' : indice_target})
         
-        fig = px.bar(dados_agrupados_indice, x=indice_target, y='contagem', title=f'Totalizador dos dados referentes a {indice_target}')
+        fig = px.bar(dados_agrupados_indice, x=indice_target, y='contagem', title='Totalizador dos dados referentes a {}'.format(indice_target))
         return fig
     
     else:
