@@ -3,7 +3,11 @@ from flask import Flask, request, render_template
 from flask_cors import CORS 
 
 #Outros
-import json, requests, ast, math
+import json, requests, math
+
+#Warnings
+import warnings
+warnings.filterwarnings("ignore")
 
 #Manipulação de dados
 import pandas as pd 
@@ -16,11 +20,11 @@ CORS(app)
 
 @app.route("/", methods=['POST'])
 
-#Nesta funcao eu apenas recebo informacoes do WeeHealth e preparo para fazer a requisicao dos dados la no GED
+#Nesta função eu apenas recebo informacoes do WeeHealth e preparo para fazer a requisicao dos dados la no GED
 def main():
     
-    #Recebendo o JSON e byte-data e transformando para dicionario python
-    variaveis_recebidas = ast.literal_eval(request.data.decode('UTF-8'))
+    #Recebendo o JSON POST
+    variaveis_recebidas = request.get_json()
 
     #Variaveis para fazer requisicoes para o GED
     token_target  = variaveis_recebidas['token']
@@ -94,7 +98,7 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
         quantidade_loops = math.ceil(quantidade_loops)
 
         #Se for maior que 1, fazer mais loops, senão já quebro o script e jogo pro dataframe
-        if quantidade_loops > 1: 
+        if quantidade_loops > 1:
 
             inicio = fim
             fim = fim + 5000
@@ -112,7 +116,7 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
     lista_nome_datas = []
     for data_registro in dataframe['data_registro']:
         for datas in datas_target_dataframe.iterrows():
-            
+
             #Filtro pelas datas recebidas do weehealth com as datas do GED
             if (data_registro >= datas[1]['dataInicial']) & (data_registro <= datas[1]['dataFinal']):
                 lista_nome_datas.append(datas[1]['nome'])
@@ -150,15 +154,17 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
 
     #Totalizador (A ideia é agrupar só pelo indice_target e ignorar a data)
     elif tipo_grafico == '4':
-
+        
+        #Conto a quantidade total de cada registro
         dados_agrupados_indice = dados_dashboard[indice_target].value_counts().reset_index(name='contagem').rename(columns={'index' : indice_target})
-        print(dados_agrupados_indice)
+        
         fig = px.bar(dados_agrupados_indice, x=indice_target, y='contagem', title=f'Totalizador dos dados referentes a {indice_target}')
         return fig
     
     else:
-
-        return "Erro!"
+        
+        print('Erro ao selecionar o tipo de gráfico.')
+        return "Erro ao selecionar o tipo de gráfico!"
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host='0.0.0.0')
