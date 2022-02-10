@@ -11,7 +11,7 @@ from waitress import serve
 
 #Logs
 import logging
-logging.basicConfig(filename='logs_dashboards.txt', format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S', encoding='utf-8')
+logging.basicConfig(filename='logs_dashboards.txt', format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 #Warnings
 import warnings
