@@ -31,26 +31,31 @@ CORS(app)
 #Nesta função eu apenas recebo informacoes do WeeHealth e preparo para fazer a requisicao dos dados la no GED
 def main():
     
+
     #Recebendo o JSON POST
-    variaveis_recebidas = request.get_json()
+    variaveis_recebidas = request.form.to_dict(flat=False)
 
     #Variaveis para fazer requisicoes para o GED
     try: 
 
-        token_target  = variaveis_recebidas['token']
-        url_target    = "{}/registro/pesquisa".format(variaveis_recebidas['url'])
-        area_target   = variaveis_recebidas['body']['listaIdArea']
-        indice_target = variaveis_recebidas['body']['indiceArea']
-        datas_target  = variaveis_recebidas['body']['datas']
-        tipo_grafico  = variaveis_recebidas['body']['tipoGrafico']
+        token_target  = variaveis_recebidas['token'][0]
+        url_target    = "{}/registro/pesquisa".format(variaveis_recebidas['url'][0])
+
+        json_recebido = json.loads(variaveis_recebidas['body'][0])
+
+        area_target   = json_recebido['listaIdArea']
+        indice_target = json_recebido['indiceArea']
+        datas_target  = json_recebido['datas']
+        tipo_grafico  = json_recebido['tipoGrafico']
 
     except:
         logging.error('As informações não foram enviadas corretamente. Tente novamente!')
-        abort(500)
+        abort(400)
     
     headers = {"Cookie" : "CXSSID={}".format(token_target),
                "content-type" : "application/json"
              }
+
 
     #Extração dos dados do GED
     dataframe_dados_ged = extraindo_informacoes_ged(url_target, area_target, headers, indice_target, datas_target)
@@ -64,7 +69,7 @@ def main():
         return render_template('index.html', iframe=grafico.show())
     except:
         logging.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente!')
-        return abort(500)
+        return abort(400)
 
 #Recebo a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
 def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_target):
@@ -99,14 +104,23 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
             
             for indice in registro['listaIndice']:
                 
+                
                 #Buscando a data do registro no GED
                 chave_valor[indice['identificador']] = indice['valor']
-                
+  
+            
+            #Pode ser que a coluna não exista na área especificada no GED
+            try: 
 
-            dataframe = dataframe.append({
-                indice_target : chave_valor[indice_target],
-                'data_registro' : pd.to_datetime(chave_valor['Data_do_registro'])
-            }, ignore_index=True)
+                dataframe = dataframe.append({
+                    indice_target : chave_valor[indice_target],
+                    'data_registro' : pd.to_datetime(chave_valor['Data_do_registro'])
+                }, ignore_index=True)
+
+            except:
+
+                logging.error('Nao existe a coluna {} nessa area do GED. Tente novamente!'.format(indice_target))
+                return abort(400)
 
         #Busco a quantidade de loops dividindo a quantidade de fim pelo resultado da pesquisa e arrendondo pra cima.
         quantidade_loops = (retorno_ged['totalResultadoPesquisa'] / fim)
@@ -178,7 +192,7 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
     
     else:
         
-        return "O dashboard não será renderizado."
+        return None
 
 if __name__ == "__main__":
     #Para jogar a aplicação em produção usar serve
