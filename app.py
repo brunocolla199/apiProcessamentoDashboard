@@ -6,12 +6,16 @@ from flask_cors import CORS
 #Outros
 import json, requests, math
 
+#Pegar diretório atual
+from pathlib import Path
+
+
 #Servir aplicação
 from waitress import serve
 
 #Logs
 import logging
-logging.basicConfig(filename='logs_dashboards.log', format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+logging.basicConfig(filename='{}/logs_dashboards.log'.format(Path().absolute()), format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 #Warnings
 import warnings
@@ -31,7 +35,6 @@ CORS(app)
 #Nesta função eu apenas recebo informacoes do WeeHealth e preparo para fazer a requisicao dos dados la no GED
 def main():
     
-
     #Recebendo o JSON POST
     variaveis_recebidas = request.form.to_dict(flat=False)
 
@@ -49,7 +52,7 @@ def main():
         tipo_grafico  = json_recebido['tipoGrafico']
 
     except:
-        logging.error('As informações não foram enviadas corretamente. Tente novamente!')
+        logging.error('As informações não foram enviadas corretamente. Tente novamente! BAD REQUEST - 400')
         abort(400)
     
     headers = {"Cookie" : "CXSSID={}".format(token_target),
@@ -68,7 +71,7 @@ def main():
         #Provavelmente ao lugar de index.html, será o caminho do html da aplicação
         return render_template('index.html', iframe=grafico.show())
     except:
-        logging.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente!')
+        logging.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente! BAD REQUEST - 400')
         return abort(400)
 
 #Recebo a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
