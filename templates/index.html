@@ -1,1 +1,16 @@
-<iframe frameborder='0' noresize='noresize' style='position: absolute; background: transparent; width: 100%; height:100%;' src="{{ iframe }}" frameborder="0"></iframe>
+<!-- <iframe frameborder='0' noresize='noresize' style='position: absolute; background: transparent; width: 100%; height:100%;' src="{{ iframe }}" frameborder="0"></iframe> -->
+
+<!doctype html>
+<html>
+<body style="font-family:arial, sans-serif">
+    <div id="chart" class="chart"></div>
+</body>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script type="text/javascript">
+    
+    var figure = {{graphJSON | safe}};
+    Plotly.newPlot('chart', figure.data, figure.layout);        
+
+</script>
+</html>

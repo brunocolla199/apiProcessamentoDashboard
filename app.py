@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #Flask
-from flask import Flask, request, render_template, abort
+from flask import Flask, request, render_template, abort, redirect, url_for, session
 from flask_cors import CORS 
 
 #Outros
@@ -25,21 +25,20 @@ warnings.filterwarnings("ignore")
 import pandas as pd 
 
 #Dashboard
+import plotly
 import plotly.express as px
 
 app = Flask(__name__)
 CORS(app)
 
-@app.route("/", methods=['POST'])
-
+@app.route("/grafico", methods=['POST'])
 #Nesta função eu apenas recebo informacoes do WeeHealth e preparo para fazer a requisicao dos dados la no GED
 def main():
-    
-    #Recebendo o JSON POST
-    variaveis_recebidas = request.form.to_dict(flat=False)
 
-    #Variaveis para fazer requisicoes para o GED
+    #Recebendo os dados como formulário
     try: 
+        
+        variaveis_recebidas = request.form.to_dict(flat=False)
 
         token_target  = variaveis_recebidas['token'][0]
         url_target    = "{}/registro/pesquisa".format(variaveis_recebidas['url'][0])
@@ -52,27 +51,45 @@ def main():
         tipo_grafico  = json_recebido['tipoGrafico']
 
     except:
+
         logging.error('As informações não foram enviadas corretamente. Tente novamente! BAD REQUEST - 400')
-        abort(400)
-    
+        abort(400)   
+
+
+    #Preparando os HEADERS
     headers = {"Cookie" : "CXSSID={}".format(token_target),
                "content-type" : "application/json"
              }
-
 
     #Extração dos dados do GED
     dataframe_dados_ged = extraindo_informacoes_ged(url_target, area_target, headers, indice_target, datas_target)
 
     #Chamo o método pra criar o gráfico
     grafico = criando_dashboard(dataframe_dados_ged, indice_target, tipo_grafico)
-    
-    #Caso o script não consiga renderizar o gráfico, retorno um erro
+
+
+    ###CODIGO ANTIGO
+                #Caso o script não consiga renderizar o gráfico, retorno um erro
+                #try: 
+                    #Provavelmente ao lugar de index.html, será o caminho do html da aplicação
+                    #grafico_json = json.dumps(grafico, cls=plotly.utils.PlotlyJSONEncoder)
+                    #return render_template('index.html', graphJSON=grafico_json)
+                
+                # try:
+                    
+                #     return render_template('index.html', iframe=grafico.show())
+    ###CODIGO ANTIGO
+
     try: 
-        #Provavelmente ao lugar de index.html, será o caminho do html da aplicação
-        return render_template('index.html', iframe=grafico.show())
+
+        grafico_json = json.dumps(grafico, cls=plotly.utils.PlotlyJSONEncoder)
+        return grafico_json
+        #return render_template('index.html', graphJSON=grafico_json)
+
     except:
-        logging.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente! BAD REQUEST - 400')
-        return abort(400)
+
+       logging.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente! BAD REQUEST - 400')
+       return abort(400)
 
 #Recebo a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
 def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_target):
@@ -83,7 +100,14 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
     fim = 5000 #Escolhi esse número porque o Zyad disse que é o limite do GED
     
 
+    #Estruturando os dados recebidos pelo WeeHealth
     dataframe = pd.DataFrame()
+    datas_target_dataframe                = pd.DataFrame(datas_target)
+    datas_target_dataframe['dataInicial'] = pd.to_datetime(datas_target_dataframe['dataInicial'])
+    datas_target_dataframe['dataFinal']   = pd.to_datetime(datas_target_dataframe['dataFinal'])
+
+    data_target_minima = datas_target_dataframe['dataInicial'].min()
+    data_target_maxima = datas_target_dataframe['dataFinal'].max()
 
     #Início dos loops para adicionar dados ao dataframe
     while True: 
@@ -110,15 +134,23 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
                 
                 #Buscando a data do registro no GED
                 chave_valor[indice['identificador']] = indice['valor']
-  
             
             #Pode ser que a coluna não exista na área especificada no GED
             try: 
+                
+                data_registro = pd.to_datetime(chave_valor['Data_do_registro'], dayfirst=True)
+                
+                #Filtro o período recebido pelo WeeHealth com os dados do GED
+                if (data_registro >= data_target_minima) & (data_registro <= data_target_maxima):
 
-                dataframe = dataframe.append({
-                    indice_target : chave_valor[indice_target],
-                    'data_registro' : pd.to_datetime(chave_valor['Data_do_registro'])
-                }, ignore_index=True)
+                    dataframe = dataframe.append({
+                        indice_target : chave_valor[indice_target],
+                        'data_registro' : data_registro
+                    }, ignore_index=True)
+                
+                else:
+
+                    continue 
 
             except:
 
@@ -140,10 +172,6 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
 
             break 
         
-    datas_target_dataframe                = pd.DataFrame(datas_target)
-    datas_target_dataframe['dataInicial'] = pd.to_datetime(datas_target_dataframe['dataInicial'])
-    datas_target_dataframe['dataFinal']   = pd.to_datetime(datas_target_dataframe['dataFinal'])
-
     #Busco o nome da data recebido da aplicação da Weehealth para cada data do registro
     lista_nome_datas = []
     for data_registro in dataframe['data_registro']:
@@ -153,7 +181,7 @@ def extraindo_informacoes_ged(url, area_target, headers, indice_target, datas_ta
             if (data_registro >= datas[1]['dataInicial']) & (data_registro <= datas[1]['dataFinal']):
                 lista_nome_datas.append(datas[1]['nome'])
 
-
+ 
     dataframe['nome_data'] = lista_nome_datas
 
     return dataframe
