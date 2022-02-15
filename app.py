@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #Flask
-from flask import Flask, request, render_template, abort, redirect, url_for, session
+from flask import Flask, request, abort
 from flask_cors import CORS 
 
 #Outros
@@ -66,20 +66,7 @@ def main():
 
     #Chamo o método pra criar o gráfico
     grafico = criando_dashboard(dataframe_dados_ged, indice_target, tipo_grafico)
-
-
-    ###CODIGO ANTIGO
-                #Caso o script não consiga renderizar o gráfico, retorno um erro
-                #try: 
-                    #Provavelmente ao lugar de index.html, será o caminho do html da aplicação
-                    #grafico_json = json.dumps(grafico, cls=plotly.utils.PlotlyJSONEncoder)
-                    #return render_template('index.html', graphJSON=grafico_json)
-                
-                # try:
-                    
-                #     return render_template('index.html', iframe=grafico.show())
-    ###CODIGO ANTIGO
-
+    
     try: 
 
         grafico_json = json.dumps(grafico, cls=plotly.utils.PlotlyJSONEncoder)
