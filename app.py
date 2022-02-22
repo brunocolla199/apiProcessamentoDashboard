@@ -6,20 +6,12 @@ from flask_cors import CORS
 #Outros
 import json, requests, math
 
-#Pegar diretório atual
-from pathlib import Path
-
+#Logs
+import logging
+logging.basicConfig(filename='./logs_dashboards.log',  format='%(asctime)s %(levelname)s --- %(message)s')
 
 #Servir aplicação
 from waitress import serve
-
-#Logs
-import logging
-logging.basicConfig(filename='{}/logs_dashboards.log'.format(Path().absolute()), format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
-
-#Warnings
-#import warnings
-#warnings.filterwarnings("ignore")
 
 #Manipulação de dados
 import pandas as pd 
@@ -53,8 +45,8 @@ def main():
         titulo_grafico          = json_recebido['tituloGrafico'].split('-')[0] # Título que vai no dashboard
 
     except:
-
-        logging.error('As informações não foram enviadas corretamente. Tente novamente! BAD REQUEST - 400')
+        
+        app.logger.error('As informacoes nao foram enviadas corretamente. Tente novamente!')
         abort(400)   
 
 
@@ -78,7 +70,7 @@ def main():
 
     except:
 
-       logging.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente! BAD REQUEST - 400')
+       app.logger.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente')
        return abort(400)
 
 #Receber a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
@@ -156,13 +148,14 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
 
         except:
 
-            logging.error('Não existe a coluna passada como parâmetro no GED. BAD REQUEST - 400')
+            app.logger.error('Nao existe a coluna passada como parametro no GED.')
             return abort(400)
 
 
         if dataframe.empty:
 
-            logging.info('Não há registros com o filtros selecionados!')
+            app.logger.info('Nao ha registros com o filtros selecionados!')
+            abort(404)
 
         #Buscar a quantidade de loops dividindo a quantidade de fim pelo resultado da pesquisa e arrendondo pra cima.
         quantidade_loops = (retorno_ged['totalResultadoPesquisa'] / fim)
@@ -199,7 +192,6 @@ def criando_dashboard(dados_dashboard, tipo_grafico, titulo_grafico, descricao_i
 
     #Agrupar os dados para gerar a contagem de registros
     dados_agrupados_data_indice = dados_dashboard.groupby(['Período', descricao_indice_target]).count().reset_index().rename(columns={'Data_do_registro' : 'Contagem'})
-    print(dados_agrupados_data_indice)
 
     ##Verificar qual tipo de gráfico a aplicação da weehealth quer
 
@@ -216,7 +208,6 @@ def criando_dashboard(dados_dashboard, tipo_grafico, titulo_grafico, descricao_i
         #Fazer em ordem do mês
         fig = px.bar(dados_agrupados_data_indice, x=descricao_indice_target, y='Contagem', barmode="group", 
                     facet_col='Período', title=titulo_grafico)
-        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
 
         return fig
 
