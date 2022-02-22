@@ -65,8 +65,8 @@ def main():
     try: 
 
         grafico_json = json.dumps(grafico, cls=plotly.utils.PlotlyJSONEncoder)
-        return grafico_json
-        #return render_template('index.html', graphJSON=grafico_json)
+        #return grafico_json
+        return render_template('index.html', graphJSON=grafico_json)
 
     except:
 
@@ -155,7 +155,7 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
         if dataframe.empty:
 
             app.logger.info('Nao ha registros com o filtros selecionados!')
-            abort(404)
+            return abort(404)
 
         #Buscar a quantidade de loops dividindo a quantidade de fim pelo resultado da pesquisa e arrendondo pra cima.
         quantidade_loops = (retorno_ged['totalResultadoPesquisa'] / fim)
@@ -208,6 +208,7 @@ def criando_dashboard(dados_dashboard, tipo_grafico, titulo_grafico, descricao_i
         #Fazer em ordem do mês
         fig = px.bar(dados_agrupados_data_indice, x=descricao_indice_target, y='Contagem', barmode="group", 
                     facet_col='Período', title=titulo_grafico)
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
 
         return fig
 
