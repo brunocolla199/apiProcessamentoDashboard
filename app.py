@@ -65,8 +65,8 @@ def main():
     try: 
 
         grafico_json = json.dumps(grafico, cls=plotly.utils.PlotlyJSONEncoder)
-        #return grafico_json
-        return render_template('index.html', graphJSON=grafico_json)
+        return grafico_json
+        #return render_template('index.html', graphJSON=grafico_json)
 
     except:
 
