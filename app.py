@@ -18,8 +18,8 @@ import logging
 logging.basicConfig(filename='{}/logs_dashboards.log'.format(Path().absolute()), format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 #Warnings
-import warnings
-warnings.filterwarnings("ignore")
+#import warnings
+#warnings.filterwarnings("ignore")
 
 #Manipulação de dados
 import pandas as pd 
@@ -38,17 +38,20 @@ def main():
     #Receber os dados como formulário do Weehealth
     try: 
         
-        variaveis_recebidas = request.form.to_dict(flat=False)
-        token_target  = variaveis_recebidas['token'][0]
-        url_target    = "{}/registro/pesquisa".format(variaveis_recebidas['url'][0])
-
-        json_recebido = json.loads(variaveis_recebidas['body'][0])
-        area_target           = json_recebido['listaIdArea'] #Id da área que contém os dados
-        indice_target         = json_recebido['indiceArea']  #Coluna no GED que o usuário quer ver no dashboard
-        datas_target          = json_recebido['datas']       #Período que o usuário quer
-        tipo_grafico          = json_recebido['tipoGrafico'] #Tipo do gráfico que o usuário quer
-        indices_filtro_target = json_recebido['indiceValor'] #Esses índices podem vir com valor ou apenas uma lista vazia     
+        variaveis_recebidas   = request.form.to_dict(flat=False)
         
+        token_target            = variaveis_recebidas['token'][0] #Token para receber dados do GED
+        url_target              = "{}/registro/pesquisa".format(variaveis_recebidas['url'][0]) #Endpoint da API do GED para extrair os dados
+
+        json_recebido           = json.loads(variaveis_recebidas['body'][0]) #Carregar o JSON que é passado como parâmetro do Weehealth
+        area_target             = json_recebido['listaIdArea'] #Id da área que contém os dados
+        indice_target           = json_recebido['indiceArea']  #Coluna no GED que o usuário quer ver no dashboard
+        descricao_indice_target = json_recebido['descricaoIndiceArea'] # Descrição do indice target
+        datas_target            = json_recebido['datas']       #Período que o usuário quer
+        tipo_grafico            = json_recebido['tipoGrafico'] #Tipo do gráfico que o usuário quer
+        indices_filtro_target   = json_recebido['indiceValor'] #Esses índices podem vir com valor ou apenas uma lista vazia     
+        titulo_grafico          = json_recebido['tituloGrafico'].split('-')[0] # Título que vai no dashboard
+
     except:
 
         logging.error('As informações não foram enviadas corretamente. Tente novamente! BAD REQUEST - 400')
@@ -60,11 +63,12 @@ def main():
                "content-type" : "application/json"
              }
 
-    #Extração dos dados do GED
-    dataframe_dados_ged = preparacao_extracao_dados(url_target, area_target, headers, indice_target, datas_target, indices_filtro_target)
+    #Extração dos dados do GED e preparação dos mesmos
+    dataframe_dados_ged = preparacao_extracao_dados(url_target, area_target, headers, indice_target, datas_target, indices_filtro_target, descricao_indice_target)
+
 
     #Chamar o método para criar o gráfico
-    grafico = criando_dashboard(dataframe_dados_ged, indice_target, tipo_grafico)
+    grafico = criando_dashboard(dataframe_dados_ged, tipo_grafico, titulo_grafico, descricao_indice_target)
     
     try: 
 
@@ -78,7 +82,7 @@ def main():
        return abort(400)
 
 #Receber a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
-def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_target, indices_filtro_target):
+def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_target, indices_filtro_target, descricao_indice_target):
 
     #Aplicar paginação
 
@@ -113,8 +117,8 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
                 #Buscar a data do registro no GED
                 chave_valor[indice['identificador']] = indice['valor']
 
-            dataframe = dataframe.append(chave_valor, ignore_index=True)
-
+            dataframe = pd.concat([dataframe, pd.DataFrame([chave_valor])], ignore_index=True)
+    
         #Transformações nos dados
         
         #Estruturar os dados para filtragem, recebidos pelo WeeHealth - Datas
@@ -158,8 +162,7 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
 
         if dataframe.empty:
 
-            logging.error('Não há registros com o filtros selecionados!')
-            return abort(400)
+            logging.info('Não há registros com o filtros selecionados!')
 
         #Buscar a quantidade de loops dividindo a quantidade de fim pelo resultado da pesquisa e arrendondo pra cima.
         quantidade_loops = (retorno_ged['totalResultadoPesquisa'] / fim)
@@ -186,15 +189,17 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
                 lista_nome_datas.append(datas[1]['nome'])
 
  
-    dataframe['nome_data'] = lista_nome_datas
+    dataframe['Período'] = lista_nome_datas
+    dataframe.rename(columns={indice_target : descricao_indice_target}, inplace=True)
 
     return dataframe
 
 #Passar dados para construir dashboard
-def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
+def criando_dashboard(dados_dashboard, tipo_grafico, titulo_grafico, descricao_indice_target):
 
     #Agrupar os dados para gerar a contagem de registros
-    dados_agrupados_data_indice = dados_dashboard.groupby(['nome_data', indice_target]).count().reset_index().rename(columns={'Data_do_registro' : 'contagem'})
+    dados_agrupados_data_indice = dados_dashboard.groupby(['Período', descricao_indice_target]).count().reset_index().rename(columns={'Data_do_registro' : 'Contagem'})
+    print(dados_agrupados_data_indice)
 
     ##Verificar qual tipo de gráfico a aplicação da weehealth quer
 
@@ -202,15 +207,15 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
     if tipo_grafico == '1':
         
         #Fazer em ordem do mês
-        fig = px.line(dados_agrupados_data_indice, x="nome_data", y="contagem", color=indice_target, markers=True, title='Dados referentes a {}'.format(indice_target))
+        fig = px.line(dados_agrupados_data_indice, x="Período", y="Contagem", color=descricao_indice_target, markers=True, title=titulo_grafico)
         return fig
 
     #Gráfico de barras agrupado por nome da data
     elif tipo_grafico == '2':
 
         #Fazer em ordem do mês
-        fig = px.bar(dados_agrupados_data_indice, x=indice_target, y='contagem', barmode="group", 
-                    facet_col='nome_data', title='Dados referentes a {}'.format(indice_target))
+        fig = px.bar(dados_agrupados_data_indice, x=descricao_indice_target, y='Contagem', barmode="group", 
+                    facet_col='Período', title=titulo_grafico)
         fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
 
         return fig
@@ -218,16 +223,16 @@ def criando_dashboard(dados_dashboard, indice_target, tipo_grafico):
     #Gráfico de pizza
     elif tipo_grafico == '3':
 
-        fig = px.pie(dados_agrupados_data_indice, values='contagem', names=indice_target, title='Dados referentes a {}'.format(indice_target))
+        fig = px.pie(dados_agrupados_data_indice, values='Contagem', names=descricao_indice_target, title=titulo_grafico)
         return fig
 
-    #Totalizador (A ideia é agrupar só pelo indice_target e ignorar a data)
+    #Totalizador (A ideia é agrupar só pelo descricao_indice_target e ignorar a data)
     elif tipo_grafico == '4':
         
         #Contagem da quantidade total de cada registro
-        dados_agrupados_indice = dados_dashboard[indice_target].value_counts().reset_index(name='contagem').rename(columns={'index' : indice_target})
+        dados_agrupados_indice = dados_dashboard[descricao_indice_target].value_counts().reset_index(name='Contagem').rename(columns={'index' : descricao_indice_target})
         
-        fig = px.bar(dados_agrupados_indice, x=indice_target, y='contagem', title='Totalizador dos dados referentes a {}'.format(indice_target))
+        fig = px.bar(dados_agrupados_indice, x=descricao_indice_target, y='Contagem', title=titulo_grafico)
         return fig
     
     else:
