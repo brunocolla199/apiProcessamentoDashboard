@@ -59,6 +59,11 @@ def main():
     dataframe_dados_ged = preparacao_extracao_dados(url_target, area_target, headers, indice_target, datas_target, indices_filtro_target, descricao_indice_target)
 
 
+    #Verifica se o Dataframe é vazio, caso seja, retornarei uma mensagem de aviso
+    if dataframe_dados_ged.empty:
+        app.logger.info('Nao ha registros com o filtros selecionados!')
+        return render_template('retorno_dataframe_vazio.html')   
+
     #Chamar o método para criar o gráfico
     grafico = criando_dashboard(dataframe_dados_ged, tipo_grafico, titulo_grafico, descricao_indice_target)
     
@@ -119,7 +124,7 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
         datas_target_dataframe['dataFinal']   = pd.to_datetime(datas_target_dataframe['dataFinal'])
         data_target_minima = datas_target_dataframe['dataInicial'].min()
         data_target_maxima = datas_target_dataframe['dataFinal'].max()
-
+ 
         #Estruturar os dados para filtragem, recebidos pelo Weehealth - Outras informações
         indices_fitro_target_dataframe = pd.DataFrame(indices_filtro_target)
 
@@ -151,12 +156,6 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
             app.logger.error('Nao existe a coluna passada como parametro no GED.')
             return abort(400)
 
-
-        if dataframe.empty:
-
-            app.logger.info('Nao ha registros com o filtros selecionados!')
-            return abort(404)
-
         #Buscar a quantidade de loops dividindo a quantidade de fim pelo resultado da pesquisa e arrendondo pra cima.
         quantidade_loops = (retorno_ged['totalResultadoPesquisa'] / fim)
         quantidade_loops = math.ceil(quantidade_loops)
@@ -171,18 +170,22 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
         else:
 
             break 
-            
+
+
     #Buscar o nome da data recebido da aplicação da Weehealth para cada data do registro
     lista_nome_datas = []
+    lista_ordem_datas = []
     for data_registro in dataframe['Data_do_registro']:
         for datas in datas_target_dataframe.iterrows():
 
             #Filtro pelas datas recebidas do weehealth com as datas do GED
             if (data_registro >= datas[1]['dataInicial']) & (data_registro <= datas[1]['dataFinal']):
                 lista_nome_datas.append(datas[1]['nome'])
+                lista_ordem_datas.append(datas[1]['ordem'])
 
- 
     dataframe['Período'] = lista_nome_datas
+    dataframe['Ordem Período'] = lista_ordem_datas
+
     dataframe.rename(columns={indice_target : descricao_indice_target}, inplace=True)
 
     return dataframe
@@ -191,7 +194,7 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
 def criando_dashboard(dados_dashboard, tipo_grafico, titulo_grafico, descricao_indice_target):
 
     #Agrupar os dados para gerar a contagem de registros
-    dados_agrupados_data_indice = dados_dashboard.groupby(['Período', descricao_indice_target]).count().reset_index().rename(columns={'Data_do_registro' : 'Contagem'})
+    dados_agrupados_data_indice = dados_dashboard.groupby(['Período', descricao_indice_target, 'Ordem Período']).count().reset_index().rename(columns={'Data_do_registro' : 'Contagem'}).sort_values('Ordem Período', ascending=True)
 
     ##Verificar qual tipo de gráfico a aplicação da weehealth quer
 
