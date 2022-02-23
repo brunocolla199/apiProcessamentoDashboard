@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
 #Flask
-from flask import Flask, Response, request, abort, render_template
+from flask import Flask, request, abort, render_template
 from flask_cors import CORS 
 
 #Outros
-import json, requests, math
-
-#Logs
-import logging
-logging.basicConfig(filename='./logs_dashboards.log',  format='%(asctime)s %(levelname)s --- %(message)s')
+import json, requests, math, os
 
 #Servir aplicação
 from waitress import serve
@@ -19,6 +15,9 @@ import pandas as pd
 #Dashboard
 import plotly
 import plotly.express as px
+
+#Datetime
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -46,7 +45,7 @@ def main():
 
     except:
         
-        app.logger.error('As informacoes nao foram enviadas corretamente. Tente novamente!')
+        gerar_logs('As informacoes nao foram enviadas corretamente. Tente novamente! --- HTTP STATUS: 400')
         abort(400)   
 
 
@@ -61,7 +60,7 @@ def main():
 
     #Verifica se o Dataframe é vazio, caso seja, retornarei uma mensagem de aviso
     if dataframe_dados_ged.empty:
-        app.logger.info('Nao ha registros com o filtros selecionados!')
+        gerar_logs('Nao ha registros com o filtros selecionados! --- HTTP STATUS: 200')
         return render_template('retorno_dataframe_vazio.html')   
 
     #Chamar o método para criar o gráfico
@@ -75,7 +74,7 @@ def main():
 
     except:
 
-       app.logger.error('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente')
+       gerar_logs('Ocorreu um erro ao renderizar o grafico. Verifique o tipo do grafico que foi passado e tente novamente --- HTTP STATUS: 400')
        return abort(400)
 
 #Receber a URL, body, headers, indice recebido do weehealth e as datas recebidas do weehealth
@@ -153,7 +152,7 @@ def preparacao_extracao_dados(url, area_target, headers, indice_target, datas_ta
 
         except:
 
-            app.logger.error('Nao existe a coluna passada como parametro no GED.')
+            gerar_logs('Nao existe a coluna passada como parametro no GED --- HTTP STATUS: 400')
             return abort(400)
 
         #Buscar a quantidade de loops dividindo a quantidade de fim pelo resultado da pesquisa e arrendondo pra cima.
@@ -233,6 +232,12 @@ def criando_dashboard(dados_dashboard, tipo_grafico, titulo_grafico, descricao_i
     else:
         
         return None
+
+
+def gerar_logs(texto):
+    f = open("{}/logs_dashboards.log".format(os.path.dirname(os.path.abspath(__file__))), "a")
+    f.write('{} --- {}\n'.format(datetime.now() ,texto))
+    f.close()
 
 if __name__ == "__main__":
     #Para jogar a aplicação em produção usar serve
