@@ -69,6 +69,7 @@ def main():
     try: 
 
         grafico_json = json.dumps(grafico, cls=plotly.utils.PlotlyJSONEncoder)
+        gerar_logs('O grafico foi retornado com sucesso! --- HTTP STATUS: 200')
         return grafico_json
         #return render_template('index.html', graphJSON=grafico_json)
 
